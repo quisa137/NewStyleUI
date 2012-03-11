@@ -1,0 +1,547 @@
+
+<!doctype html>
+<html lang="ko">
+	<head>
+	<title>New Style UI #1</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=EUC-KR" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
+	<!--target-densitydpi=device-dpi, -->
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+	<script type="text/javascript">
+	window.addEventListener("load",function(){setTimeout(scrollTo,0,0,1);},false);
+	$(window).load(function(e){
+		setTimeout(scrollTo,0,0,1);
+	});
+
+	window.addEventListener("orientationchange",function(ev) {
+		ev.preventDefault();
+		var orientation = window.orientation;
+		switch(orientation) {
+		case 0:				//세로보기
+			alignLayout(416);
+			break;
+		case 90:
+		case -90:			//가로보기
+			alignLayout(270);
+			break;
+		}
+	},false);
+
+	var _touchCtrlObjes = [];
+	var targetObjQuery = "#left,#right";
+	var winWidth,winHeight,divWidth,divHeight;
+	var checkedAnswer = 0;
+	var coupleRemove = false;
+	var contentArr = [];
+	var moveCnt = 0;
+	
+	//레이아웃 콘트롤러
+	function alignLayout(height){
+		winWidth = $(window).width();
+		winHeight = height;
+		divWidth = Math.ceil(winWidth/4);
+		divHeight = (winHeight==416)?(winHeight/3):(winHeight/2);
+		$(document.body).width(winWidth).height(winHeight);
+
+		$("#left,#right").width(divWidth);
+		$("#wrap").width(winWidth).height(winHeight);
+		$("#center").width(winWidth);
+		if(winHeight==416){
+			$("#leftSelected,#rightSelected").width(divWidth*1.3).height(120).offset({left:divWidth+28});
+		}else{
+			$("#leftSelected,#rightSelected").width(divWidth*1.5).height(120).offset({left:divWidth+28});
+		}
+		
+		$("#leftSelGuide").offset({left:2}).width(divWidth+18);
+		$("#rightSelGuide").offset({left:(divWidth*3-24)}).width(divWidth+18);
+		$(".fullPage").width(winWidth-24).height(winHeight-24);
+		$("#backLayer").width(winWidth).height(winHeight);
+	}
+
+	$(function(){
+		if(window.orientation==0)
+			alignLayout(416);
+		else
+			alignLayout(270);
+		
+		//터치 이벤트 설치 부분
+		document.getElementById("wrap").addEventListener("touchstart", startHandler,false);
+		document.getElementById("wrap").addEventListener("touchmove", moveHandler, false);
+		document.getElementById("left").addEventListener("touchend", function(ev){
+			_touchCtrlObjes["touchL"]._mutex = false;
+			_touchCtrlObjes["touchL"] = null;
+			//$("#center").html($("#center").html()+"<br>" + moveCnt +"뮤텍스 잠금 해제");
+		},false);
+		document.getElementById("right").addEventListener("touchend", function(ev){
+			_touchCtrlObjes["touchR"]._mutex = false;
+			_touchCtrlObjes["touchR"] = null;
+			//$("#center").html($("#center").html()+"<br>" + moveCnt +"뮤텍스 잠금 해제");
+		},false);
+		/* 중력센서*/
+		if (window.DeviceOrientationEvent) {
+			window.addEventListener('deviceorientation', function(eventData) {
+				$("#center").text("중력");
+				var tiltLR = eventData.gamma;
+				var tiltFB = eventData.beta;
+				var dir = eventData.alpha
+				var motUD = null;
+				deviceOrientationHandler(tiltLR, tiltFB, dir, motUD);
+			}, false);
+		} else if (window.OrientationEvent) {
+			/*모질라 호환성을 위한 부분 사실상 필요 없음, 스맛폰은 웹킷천하!!*/
+			document.getElementById("doEvent").innerHTML = "MozOrientation";
+			window.addEventListener('MozOrientation', function(eventData) {
+				var tiltLR = eventData.x * 90;
+				var tiltFB = eventData.y * -90;
+				var dir = null;
+				var motUD = eventData.z;
+				deviceOrientationHandler(tiltLR, tiltFB, dir, motUD);
+			}, false);
+		}
+
+
+		$(".fullPage").click(function(e){
+			$(this).fadeOut(600,function(){
+				$("#backLayer").hide();
+				if(checkedAnswer>=3){
+					window.setTimeout("location.reload()",500);
+				}
+			});
+		});
+	});
+	var deltaDegree = 0;
+	var oldDegree = 0;
+	function deviceOrientationHandler(tiltLR, tiltFB, dir, motionUD) {
+		deltaDegree = tiltFB - oldDegree;
+		oldDegree = tiltFB;
+		$("#center").text((tiltLR+tiltFB));
+		if(Math.abs(deltaDegree)>10){
+			if(-90 <= tiltFB && tiltFB < 0){
+				type="L";
+			}else if(-180 <= tiltFB && tiltFB < -90){
+				type="R";
+			}
+			if(_touchCtrlObjes["touch"+type] == undefined && type != ""){
+				_touchCtrlObjes["touch"+type] = touchController({screenX:12,screenY:0},type);
+			}
+			_touchCtrlObjes["touch"+type].move({screenX:12,screenY:(tiltLR+tiltFB)});
+		}
+	}
+	function detactTarget(touchX){
+		var objs = $(targetObjQuery);
+		for(var i=0;i<objs.length;i++){
+			obj = $(objs[i]);
+			var left = obj.position().left;
+			var right = obj.position().left+obj.width();
+			if(left<=touchX && touchX <=right){
+				return obj.prop("id").substr(0,1).toUpperCase();
+				break;
+			} 
+		}
+		return "";
+	}
+	/*~Handler로 끝나는 함수들은 터치 이벤트에 대한 핸들러들*/
+	function startHandler(ev){
+		var pinger = null;
+		if(coupleRemove == true){
+			coupleRemove = false;
+			$("#leftSelected div,#rightSelected div").hide("slow").remove();
+			$("#center").text("");
+		}
+		for(var i=0;i<ev.touches.length;i++){
+			pinger = ev.touches[i];
+			
+			type = detactTarget(pinger.screenX);
+			if( _touchCtrlObjes["touch"+type] == undefined && type != ""){
+				ev.preventDefault();
+				//$("#center").html("핸들러 스타트");
+				_touchCtrlObjes["touch"+type] = touchController(pinger,type);
+			}else{
+				//$("#center").text(pinger.identifier);
+			}
+		}
+	}
+	function moveHandler(ev){
+		var pinger = null;
+		var controller = null;
+		for(var i=0;i<ev.touches.length;i++){
+			pinger = ev.touches[i];
+			type = detactTarget(pinger.screenX);
+			if(_touchCtrlObjes["touch" + type]==undefined){
+				//$("#center").text("이상 감지 : " + pinger.identifier );
+			}else if(type!=""){
+				ev.preventDefault();
+				controller = _touchCtrlObjes["touch" + type];
+				if(controller._mutex==false){
+					controller.move(pinger);
+					if(Math.abs(controller._deltaY)>10){
+						moveCnt++;
+						controller._mutex = true;
+						controller.slide();
+					}
+				}
+			}
+		}
+	}
+	function answerCheck(){
+		if($("#leftSelected div,#rightSelected div").length==2){
+			if($("#leftSelected div").data("ans")==$("#rightSelected div").data("ans")){
+				if(checkedAnswer>=3){
+					$("#backLayer").show();
+					window.setTimeout(function(){
+					$("[name=fullPage"+$("#leftSelected div").data("ans")+"]").fadeIn(400,function(){
+						$("#center").text("정답을 모두 맞추셨습니다");
+						$("#left div,#right div").hide();
+						
+					});
+					},800);
+				}else if(checkedAnswer<3){
+					coupleRemove = true;
+					$("#backLayer").show();
+					window.setTimeout(function(){
+						$("[name=fullPage"+$("#leftSelected div").data("ans")+"]").fadeIn(400,function(){
+							checkedAnswer++;
+							$("#center").text(checkedAnswer +"개를 맞추셨습니다");
+							$("[name=l"+$("#leftSelected div").data("ans")+"]").remove();
+							$("[name=r"+$("#rightSelected div").data("ans")+"]").remove();
+						});
+					},800);
+				}
+			}else{
+				$("#center").text("알맞는 제품을 골라 주세요");
+			}
+		}
+	}
+	var touchController = (function(){
+		var touchController = function(pinger,type){
+			return new touchController.fn.init(pinger,type);
+		};
+		touchController.fn = touchController.prototype = {
+			constructor : touchController,
+			init:function(pinger,type){
+				if(this._mutex==false){
+					this._stdX=pinger.screenX; 
+					this._stdY=pinger.screenY;
+					this._type=type;
+				}
+				return this;
+			},
+			move:function(pinger){
+				this._deltaX = Math.ceil(pinger.screenX - Math.abs(this._stdX));
+				this._deltaY = Math.ceil(pinger.screenY - Math.abs(this._stdY));
+				
+				this.detactDirection();
+				return this;
+			},
+			detactDirection:function(){
+				if(Math.abs(this._deltaX)<=Math.abs(this._deltaY) && this._deltaY>0){
+					this._pointTo = "D";
+				}else if(Math.abs(this._deltaX) <= Math.abs(this._deltaY) && this._deltaY<0){
+					this._pointTo = "U";
+				}else if(Math.abs(this._deltaX) > Math.abs(this._deltaY) && this._deltaX>0){
+					this._pointTo = "R";
+				}else if(Math.abs(this._deltaX) > Math.abs(this._deltaY) && this._deltaX<0){
+					this._pointTo = "L";
+				}
+			},
+			slide : function(){
+				if(this.animating == false){
+					var delta = 0;
+					var instance = this;
+
+
+					if(this.targetObj==null){
+						if(this._type=="L"){
+							this.targetObj = $("#left");
+						}else if(this._type=="R"){
+							this.targetObj = $("#right");
+						}
+					}
+					this.stdVal = this.targetObj.offset().top;
+					this.endVal = this.targetObj.offset().top + (this._deltaY * 7);
+					var curVal = this.stdVal;
+
+
+					var interValId = window.setInterval(function(){
+						targetProper = Math.floor(instance.targetObj.offset().top + ((instance.endVal - curVal) * 0.23)); //슬라이드 공식
+						
+						/*디버그 구문*/
+						if(instance.animating==false){
+							instance.animating = true;
+						}
+						//$("#center").html($("#center").html()+"<br>"+targetProper +","+delta +","+curVal+","+instance._pointTo);
+						
+						delta = Math.floor(targetProper - curVal);
+						curVal = targetProper;
+						limitBottom = 120-instance.targetObj.find("div").innerHeight();
+						
+						if(limitBottom < targetProper && targetProper<60)
+							instance.targetObj.offset({top:targetProper});
+						
+						if((-1 < delta && delta < 1) || curVal>=60 || curVal <=limitBottom){
+							deltaVal = 0;
+							//$("#center").html($("#center").html()+"<br>"+"complete"+ limitBottom);
+							instance.animating = false;
+							instance.completedHandler();
+							window.clearInterval(interValId);			//여기이하로 코드를 두면 실행안됨
+						}
+					},50);
+				}
+			},
+			completedHandler:function(){
+				var lrType = this._type.toLowerCase();
+				var prefix = (lrType=="l")?"#left":"#right";
+				var objs = $(prefix + " div div");
+				$(prefix + "Selected").empty().html("");
+				
+				objs.each(function(i,item){
+					var obj = $(item);
+					var topPos = obj.offset().top;
+					var bottomPos = topPos + divHeight;
+					
+					if(0<topPos && bottomPos < (divHeight*1.5) && $(prefix + "Selected").children().length==0){
+						var clone = obj.clone(true);
+						clone.width(obj.width()).height(obj.height())
+							.css({"margin":"0","padding":"0","color":"black","background-color":obj.css("background-color"),"text-align":"center","font-size":"12px","display":"none","width":"100%","height":"100%"})
+							.offset({top:obj.offset().top,left:obj.offset().left})
+							.data("ans",obj.attr("name").replace(lrType,""))
+							.prop("id","rSelected");
+						$(prefix + "Selected").append(clone.show());
+						answerCheck();
+					}
+				});
+			},
+			_stdX:0,
+			_stdY:0,
+			_deltaX:0,
+			_deltaY:0,
+			_pointTo:"",
+			_type:"L",
+			animating:false,
+			targetObj:null,
+			stdVal:0,
+			endVal:0,
+			_mutex:false		//이벤트가 moving 될 때, 한번만 실행되도록 하는 실행값
+		};
+		touchController.fn.init.prototype = touchController.fn;
+		return touchController;
+	})();
+	</script>
+	<style>
+	body{padding: 0;margin: 0;width: 240px;overflow: hidden;background-color:black;-webkit-text-size-adjust:none;}
+	#wrap{overflow: hidden;width: 240px;-webkit-perspective: 300; perspective: 300;}
+	#left{height:100%;float:left;padding:0;margin-left:12px}
+	#right{height:100%;float:right;text-align:right;padding:0;margin:0;margin-right:12px;}
+	#left div div,#right div div{
+		margin:0px;
+		position: relative;
+		height:81px;
+		text-align: center;
+		font-size:12px;
+		background: rgba(120, 120, 255, 0.4);
+		border: 1px solid black;
+	}
+	#left div div{
+		background: rgba(180, 180, 255, 1);
+		margin-top:12px;
+	}
+	#right div div{
+		background: white;
+		margin-top:12px;
+	}
+	#center{text-align: center;position: absolute;z-index: 0;color:white;font-size:12px;}
+	#leftSelected{position: absolute;top:12px;z-index:20;}
+	#rightSelected{position: absolute;top:110px;z-index:20;}
+	#leftSelGuide{position: absolute;top:30px;height:95px;border:2px dashed red;z-index;2}
+	#rightSelGuide{position: absolute;top:30px;height:95px;border:2px dashed red;z-index;3}
+	.fullPage{position:absolute;top:12px;left:12px;background-color:white;z-index:20;text-align:center}
+	#backLayer{position:absolute;top:0px;left:0px;width:100%;height:100%;z-index:100;text-align:center;background-color:rgba(34,34,34,0.5);display:none;}
+	</style>
+	</head>
+	<body>
+	<div id="wrap">
+		<div id="backLayer"></div>
+		<div id="center"><!--&lt;= 좌,우를 =&gt;<BR>스크롤 해주세요.--></div>
+		<div id="leftSelected"></div>
+		<div id="rightSelected"></div>
+		<div id="leftSelGuide"></div>
+		<div id="rightSelGuide"></div>
+		<div id="left">
+			<div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+				<div name="l4">출근이 바쁜 직장인</div>
+				<div name="l2">소중한 피부 꽃미남</div>
+				<div name="l3">멋진 수염을 기르고 싶은 터프가이</div>
+				<div name="l1">댄디 & 시크한 턱선의 남자</div>
+			</div>
+		</div>
+		<div id="right">
+			<div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+				<div name="r3"><img src="1318940139594.jpg" style="width:81px;height:81px"/></div>
+				<div name="r4"><img src="1318940148101.jpg" style="width:81px;height:81px"/></div>
+				<div name="r2"><img src="1329917518986.jpg" style="width:81px;height:81px"/></div>
+				<div name="r1"><img src="1329917518987.jpg" style="width:81px;height:81px"/></div>
+			</div>
+		</div>
+	</div>
+	<div name="fullPage3" style="display:none" class="fullPage"><img src="1318940139594.jpg"/><br>멋진 수염을 기르고 싶은 터프가이(터치하면 닫힙니다.)</div>
+	<div name="fullPage4" style="display:none" class="fullPage"><img src="1318940148101.jpg"/><br>출근이 바쁜 직장인에겐(터치하면 닫힙니다.)</div>
+	<div name="fullPage2" style="display:none" class="fullPage"><img src="1329917518986.jpg"/><br>소중한 피부 꽃미남(터치하면 닫힙니다.)</div>
+	<div name="fullPage1" style="display:none" class="fullPage"><img src="1329917518987.jpg"/><br>댄디 & 시크한 턱선의 남자(터치하면 닫힙니다.)</div>
+	</body>
+</html>
