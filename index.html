@@ -6,25 +6,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
 	<!--target-densitydpi=device-dpi, -->
 	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+	<script type="text/javascript" src="mobile_init.js"></script>
 	<script type="text/javascript">
-	window.addEventListener("load",function(){setTimeout(scrollTo,0,0,1);},false);
-	$(window).load(function(e){
-		setTimeout(scrollTo,0,0,1);
-	});
-	window.addEventListener("orientationchange",function(ev) {
-		ev.preventDefault();
-		var orientation = window.orientation;
-		switch(orientation) {
-		case 0:				//세로보기
-			alignLayout(416);
-			break;
-		case 90:
-		case -90:			//가로보기
-			alignLayout(270);
-			break;
-		}
-	},false);
-
 	var _touchCtrlObjes = [];
 	var targetObjQuery = "#left,#right";
 	var winWidth,winHeight,divWidth,divHeight;
@@ -35,6 +18,7 @@
 	
 	//레이아웃 콘트롤러
 	function alignLayout(height){
+	/*
 		winWidth = $(window).width();
 		winHeight = height;
 		divWidth = Math.ceil(winWidth/4);
@@ -54,6 +38,7 @@
 		$("#rightSelGuide").offset({left:(divWidth*3-24)}).width(divWidth+18);
 		$(".fullPage").width(winWidth-24).height(winHeight-24);
 		$("#backLayer").width(winWidth).height(winHeight);
+	*/
 	}
 
 	$(function(){
@@ -85,18 +70,7 @@
 				var motUD = null;
 				deviceOrientationHandler(tiltLR, tiltFB, dir, motUD);
 			}, false);
-		} else if (window.OrientationEvent) {
-			/*모질라 호환성을 위한 부분 사실상 필요 없음, 스맛폰은 웹킷천하!!*/
-			document.getElementById("doEvent").innerHTML = "MozOrientation";
-			window.addEventListener('MozOrientation', function(eventData) {
-				var tiltLR = eventData.x * 90;
-				var tiltFB = eventData.y * -90;
-				var dir = null;
-				var motUD = eventData.z;
-				deviceOrientationHandler(tiltLR, tiltFB, dir, motUD);
-			}, false);
 		}
-
 
 		$(".fullPage").click(function(e){
 			$(this).fadeOut(600,function(){
@@ -300,7 +274,8 @@
 					if(0<topPos && bottomPos < (divHeight*1.5) && $(prefix + "Selected").children().length==0){
 						var clone = obj.clone(true);
 						clone.width(obj.width()).height(obj.height())
-							.css({"margin":"0","padding":"0","color":"black","background-color":obj.css("background-color"),"text-align":"center","font-size":"12px","display":"none","width":"100%","height":"100%"})
+							.css({"margin":"0","padding":"0","color":"black",
+									"background-color":obj.css("background-color"),"text-align":"center","font-size":"12px","display":"none","width":"100%","height":"100%"})
 							.offset({top:obj.offset().top,left:obj.offset().left})
 							.data("ans",obj.attr("name").replace(lrType,""))
 							.prop("id","rSelected");
@@ -325,36 +300,7 @@
 		return touchController;
 	})();
 	</script>
-	<style type="text/css">
-	body{padding: 0;margin: 0;width: 240px;overflow: hidden;background-color:black;-webkit-text-size-adjust:none;}
-	#wrap{overflow: hidden;width: 240px;-webkit-perspective: 300; perspective: 300;}
-	#left{height:100%;float:left;padding:0;margin-left:12px}
-	#right{height:100%;float:right;text-align:right;padding:0;margin:0;margin-right:12px;}
-	#left div div,#right div div{
-		margin:0px;
-		position: relative;
-		height:81px;
-		text-align: center;
-		font-size:12px;
-		background: rgba(120, 120, 255, 0.4);
-		border: 1px solid black;
-	}
-	#left div div{
-		background: rgba(180, 180, 255, 1);
-		margin-top:12px;
-	}
-	#right div div{
-		background: white;
-		margin-top:12px;
-	}
-	#center{text-align: center;position: absolute;z-index: 0;color:white;font-size:12px;}
-	#leftSelected{position: absolute;top:12px;z-index:20;}
-	#rightSelected{position: absolute;top:110px;z-index:20;}
-	#leftSelGuide{position: absolute;top:30px;height:95px;border:2px dashed red;z-index;2}
-	#rightSelGuide{position: absolute;top:30px;height:95px;border:2px dashed red;z-index;3}
-	.fullPage{position:absolute;top:12px;left:12px;background-color:white;z-index:20;text-align:center}
-	#backLayer{position:absolute;top:0px;left:0px;width:100%;height:100%;z-index:100;text-align:center;background-color:rgba(34,34,34,0.5);display:none;}
-	</style>
+	<link rel="stylesheet" href="mobile_layout.css" type="text/css"/>
 	</head>
 	<body>
 	<div id="wrap">

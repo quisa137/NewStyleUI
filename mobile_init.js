@@ -16,8 +16,13 @@
 			break;
 		}
 	},false);
+	if(window.DeviceMotionEvent || ('listForDeviceMovement' in window)){
+		window.addEventListener("devicemotion",motionHandler,false);
+	}
 	var alignLayout=function(){
 				
+	}
+	var motionHandler=function(){
 	}
 	var log=function(text){
 		$("#debug").html(text);
